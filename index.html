@@ -203,16 +203,17 @@ function analyze(root) {
     var total = 0n;
     co.rows.forEach(function (r) { var s = parseShares(r.shares); if (s !== null) total += s; });
     totals[co.id] = total;
-    if (total === 0n) {
-      if (depth > 0) { untraced = fadd(untraced, mult); warns.add("「" + label(co) + "」尚未輸入股東股份，其持股無法穿透。"); }
-      return;
+    if (total === 0n && depth > 0 && mult.n > 0n) {
+      untraced = fadd(untraced, mult); warns.add("「" + label(co) + "」尚未輸入股東股份，其持股無法穿透。");
     }
     co.rows.forEach(function (r) {
-      var s = parseShares(r.shares);
-      if (s === null) { warns.add("「" + label(co) + "」有股份欄位不是整數，該列未計入。"); rowPct[r.id] = null; return; }
-      if (s === 0n) { rowPct[r.id] = null; return; }
-      var f = F(s, total), m = fmul(mult, f), name = (r.name || "").trim();
-      rowPct[r.id] = f;
+      var s = parseShares(r.shares), name = (r.name || "").trim();
+      if (s === null) warns.add("「" + label(co) + "」有股份欄位不是整數，該列未計入。");
+      // 股份為 0 或未填時比例視為 0，但法人列仍要展開，才能先建結構再填股份
+      var has = s !== null && s > 0n && total > 0n;
+      var f = has ? F(s, total) : ZERO, m = fmul(mult, f);
+      rowPct[r.id] = has ? f : null;
+      if (!r.isCorp && !has) return;
       if (r.isCorp) {
         var k = keyOf(r);
         if (name) corpNames.add(name);
@@ -229,6 +230,7 @@ function analyze(root) {
         var anc2 = new Set(anc); anc2.add(k);
         walk(def, m, chain.concat([label(def)]), fracs.concat([f]), anc2, depth + 1);
       } else {
+        if (m.n === 0n) return;
         if (!name) { untraced = fadd(untraced, m); warns.add("「" + label(co) + "」有股東未填名稱，該列未歸戶。"); return; }
         var p = people.get(name);
         if (!p) { p = { name: name, direct: ZERO, paths: [], total: ZERO }; people.set(name, p); }
