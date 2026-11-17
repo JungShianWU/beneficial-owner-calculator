@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>實質受益人持股試算</title>
+<style>
+/* 固定白底淺色主題，沿用「信託服務費試算」版面：左側輸入、右側結論固定跟隨。 */
+:root {
+  --page: #ffffff;
+  --pink: #ffd7d8;
+  --pink-edge: #ffb6b8;
+  --bg: #f3f5f4;
+  --surface: #ffffff;
+  --ink: #17252a;
+  --muted: #5b6b6f;
+  --line: #d5dcda;
+  --accent: #ffb6b8;
+  --accent-soft: #ffd7d8;
+  --warn: #9a5b00;
+  --warn-soft: #fbefd8;
+  --danger: #c8102e;
+  --font-body: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", "Heiti TC", system-ui, sans-serif;
+  --font-num: "SF Mono", "Cascadia Mono", "Consolas", "Menlo", monospace;
+  color-scheme: light;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  background: var(--page);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 16px;
+  line-height: 1.6;
+}
+.wrap { max-width: 1080px; margin: 0 auto; padding: 28px 20px 56px; }
+header { margin-bottom: 20px; }
+h1 { font-size: 1.6rem; margin: 0 0 4px; letter-spacing: .02em; text-wrap: balance; }
+header p { margin: 0; color: var(--muted); font-size: .92rem; }
+.grid { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 20px; align-items: start; }
+.col { display: flex; flex-direction: column; gap: 16px; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 18px 20px; }
+.card.sub { border-left: 4px solid var(--accent); }
+h2 { font-size: 1.05rem; margin: 0 0 12px; display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+h2 small { font-weight: 400; color: var(--muted); font-size: .8rem; font-variant-numeric: tabular-nums; }
+.field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
+.field > label { font-size: .85rem; color: var(--muted); }
+input[type="text"] {
+  width: 100%; min-width: 0; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--ink);
+  font: inherit; padding: 8px 10px;
+}
+input[type="text"]:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+input.num { font: 600 1rem var(--font-num); text-align: right; }
+input.bad { border-color: var(--danger); }
+input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--accent); cursor: pointer; }
+
+.rows { display: flex; flex-direction: column; gap: 8px; }
+.r, .rh { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) 70px 44px 32px; gap: 8px; align-items: center; }
+.rh { font-size: .8rem; color: var(--muted); }
+.rh span:nth-child(2), .rh span:nth-child(3) { text-align: right; }
+.rh span:nth-child(4) { text-align: center; }
+.r .pct { font: 600 .95rem var(--font-num); text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.r .ck { display: flex; justify-content: center; }
+.r .del { padding: 0; width: 32px; height: 32px; border-color: var(--line); background: var(--surface); color: var(--muted); font-weight: 400; }
+.r .del:hover { background: var(--bg); color: var(--ink); }
+.rnote { font-size: .8rem; color: var(--warn); margin: -4px 0 2px; }
+.foot { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 12px; flex-wrap: wrap; }
+.foot .sum { font-size: .88rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+.foot .sum b { color: var(--ink); font-family: var(--font-num); }
+button {
+  font: inherit; font-weight: 600; cursor: pointer; padding: 8px 16px; border-radius: 8px;
+  border: 1px solid var(--pink-edge); background: var(--pink); color: var(--ink);
+}
+button:hover { background: var(--pink-edge); }
+button.ghost { background: var(--surface); border-color: var(--line); font-weight: 400; }
+button.ghost:hover { background: var(--bg); }
+button.sm { padding: 5px 12px; font-size: .9rem; }
+.tools { display: flex; gap: 8px; }
+
+.result { position: sticky; top: 16px; }
+h3 { font-size: .95rem; margin: 16px 0 6px; }
+.ubo { padding: 12px 16px; border-radius: 8px; background: var(--accent-soft); border: 1px solid var(--accent); display: flex; flex-direction: column; gap: 4px; }
+.ubo .u { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+.ubo .u .name { font-weight: 700; overflow-wrap: anywhere; }
+.ubo .u .val { font: 700 1.4rem var(--font-num); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.ubo .none { color: var(--muted); font-size: .92rem; }
+.red { color: var(--danger); }
+.lines { display: flex; flex-direction: column; }
+.line { padding: 10px 0; border-bottom: 1px solid var(--line); }
+.line .top { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+.line .name { font-weight: 600; overflow-wrap: anywhere; }
+.line .val { font: 700 1.1rem var(--font-num); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.line .how { font-size: .82rem; color: var(--muted); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.pill { display: inline-block; font-size: .75rem; font-weight: 700; padding: 1px 8px; border-radius: 999px; background: var(--accent-soft); color: var(--danger); margin-left: 6px; vertical-align: 1px; white-space: nowrap; }
+.checks { margin-top: 14px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; text-align: center; }
+.checks div { border: 1px solid var(--line); border-radius: 8px; padding: 8px 4px; }
+.checks b { display: block; font: 700 1.2rem var(--font-num); }
+.checks span { font-size: .78rem; color: var(--muted); }
+.checks .sum { border-color: var(--accent); }
+.warns { margin: 12px 0 0; padding: 10px 12px 10px 28px; border-radius: 8px; background: var(--warn-soft); color: var(--warn); font-size: .85rem; }
+.warns:empty { display: none; }
+.actions { margin-top: 14px; display: flex; align-items: center; gap: 12px; }
+#copied { font-size: .85rem; }
+.note { margin: 10px 0 0; font-size: .82rem; color: var(--muted); }
+.rules { margin-top: 20px; }
+.rules ol { margin: 0; padding-left: 1.3em; font-size: .9rem; }
+@media (max-width: 820px) {
+  .grid { grid-template-columns: minmax(0, 1fr); }
+  .result { position: static; }
+  .card.sub { margin-left: 0 !important; }
+}
+@media (max-width: 420px) {
+  .card { padding: 14px 12px; }
+  .r, .rh { grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr) 58px 34px 28px; gap: 5px; }
+  .r .del { width: 28px; }
+  .r .pct { font-size: .82rem; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>實質受益人持股試算</h1>
+    <p>輸入申戶公司的股東與股份；股東為法人時勾選「法人」並續填該法人的股東，系統逐層穿透，加總每位自然人的直接＋間接持股，超過 25% 者以紅色標示。</p>
+  </header>
+
+  <div class="grid">
+    <div class="col" id="inputs"></div>
+
+    <section class="card result" aria-live="polite">
+      <h2>試算結論 <small id="rootOut"></small></h2>
+      <h3 style="margin-top:0">1. 實質受益人名單（持股 &gt; 25%）</h3>
+      <div class="ubo" id="ubo"></div>
+      <h3>2. 計算明細</h3>
+      <div class="lines" id="detail"></div>
+      <div class="checks">
+        <div><b id="nPeople"></b><span>自然人（位）</span></div>
+        <div><b id="nUbo"></b><span>超過 25%（位）</span></div>
+        <div class="sum"><b id="traced"></b><span>已穿透比例</span></div>
+      </div>
+      <ul class="warns" id="warns"></ul>
+      <div class="actions">
+        <button type="button" id="copy">複製結論</button>
+        <span id="copied" role="status"></span>
+      </div>
+    </section>
+  </div>
+
+  <section class="card rules">
+    <h2>計算規則</h2>
+    <ol>
+      <li>總持股比例 ＝ 直接持股 ＋ 各層法人股東持股比例相乘之總和；同一人透過不同路徑持有的股權全部加總。</li>
+      <li>遇到法人股東一路向上穿透，直到最頂層的自然人。</li>
+      <li>門檻為嚴格大於 25%（剛好 25% 不算）。</li>
+    </ol>
+    <p class="note">各公司持股比例 ＝ 該股東股份 ÷ 該公司所填股份合計。同名視為同一人；同一法人出現在多處時，只需填一次股東結構。比例以分數精確計算，顯示時四捨五入至小數第二位。</p>
+  </section>
+</div>
+
+<script>
+/*CALC-START*/
+// 比例一律以 BigInt 分數計算，避免浮點誤差影響「剛好 25%」的判斷。
+function gcd(a, b) { while (b) { var t = a % b; a = b; b = t; } return a < 0n ? -a : a; }
+function F(n, d) { var g = gcd(n, d) || 1n; return { n: n / g, d: d / g }; }
+function fmul(a, b) { return F(a.n * b.n, a.d * b.d); }
+function fadd(a, b) { return F(a.n * b.d + b.n * a.d, a.d * b.d); }
+function over25(f) { return f.n * 4n > f.d; }          // 嚴格大於 25%
+var ZERO = F(0n, 1n), ONE = F(1n, 1n);
+
+// 分數 -> 百分比字串（四捨五入）
+function pctFixed(f, digits) {
+  var scale = 10n ** BigInt(digits + 2);
+  var v = (f.n * scale * 2n + f.d) / (f.d * 2n);
+  var unit = 10n ** BigInt(digits);
+  var frac = (v % unit).toString().padStart(digits, "0");
+  return (v / unit).toString() + "." + frac;
+}
+function pct(f) {
+  var s = pctFixed(f, 2);
+  // 四捨五入後剛好顯示 25.00 但實際不等於 25% 時，多顯示兩位以免誤判
+  if (s === "25.00" && !(f.n * 4n === f.d)) s = pctFixed(f, 4);
+  return s + "%";
+}
+
+// 股份文字 -> BigInt；空白為 0；無法辨識回傳 null
+function parseShares(text) {
+  var t = String(text == null ? "" : text).replace(/[,\s，]/g, "");
+  if (t === "") return 0n;
+  if (!/^\d+$/.test(t)) return null;
+  return BigInt(t);
+}
+
+// root: { id, name, rows:[{ id, name, shares, isCorp, rows:[...] }] }
+function analyze(root) {
+  var people = new Map(), cards = [], status = {}, rowPct = {}, totals = {}, corpEff = {};
+  var defs = new Map(), carded = new Set(), warns = new Set(), corpNames = new Set();
+  var untraced = ZERO;
+  function keyOf(co) { var n = (co.name || "").trim(); return n ? "n:" + n : "#" + co.id; }
+  function label(co) { return (co.name || "").trim() || "（未命名）"; }
+  defs.set(keyOf(root), root);
+
+  function walk(co, mult, chain, fracs, anc, depth) {
+    var total = 0n;
+    co.rows.forEach(function (r) { var s = parseShares(r.shares); if (s !== null) total += s; });
+    totals[co.id] = total;
+    if (total === 0n) {
+      if (depth > 0) { untraced = fadd(untraced, mult); warns.add("「" + label(co) + "」尚未輸入股東股份，其持股無法穿透。"); }
+      return;
+    }
+    co.rows.forEach(function (r) {
+      var s = parseShares(r.shares);
+      if (s === null) { warns.add("「" + label(co) + "」有股份欄位不是整數，該列未計入。"); rowPct[r.id] = null; return; }
+      if (s === 0n) { rowPct[r.id] = null; return; }
+      var f = F(s, total), m = fmul(mult, f), name = (r.name || "").trim();
+      rowPct[r.id] = f;
+      if (r.isCorp) {
+        var k = keyOf(r);
+        if (name) corpNames.add(name);
+        if (anc.has(k)) {
+          status[r.id] = "cycle"; untraced = fadd(untraced, m);
+          warns.add("「" + label(r) + "」與上層公司交叉持股，該路徑無法穿透。");
+          return;
+        }
+        var def = defs.get(k);
+        if (!def) { def = r; defs.set(k, r); }
+        status[r.id] = def === r ? "def" : "alias";
+        corpEff[def.id] = fadd(corpEff[def.id] || ZERO, m);
+        if (!carded.has(def.id)) { carded.add(def.id); cards.push({ co: def, depth: depth + 1, parent: label(co) }); }
+        var anc2 = new Set(anc); anc2.add(k);
+        walk(def, m, chain.concat([label(def)]), fracs.concat([f]), anc2, depth + 1);
+      } else {
+        if (!name) { untraced = fadd(untraced, m); warns.add("「" + label(co) + "」有股東未填名稱，該列未歸戶。"); return; }
+        var p = people.get(name);
+        if (!p) { p = { name: name, direct: ZERO, paths: [], total: ZERO }; people.set(name, p); }
+        if (chain.length === 0) p.direct = fadd(p.direct, m);
+        else p.paths.push({ chain: chain, fracs: fracs.concat([f]), value: m });
+        p.total = fadd(p.total, m);
+      }
+    });
+  }
+  var anc0 = new Set(); anc0.add(keyOf(root));
+  walk(root, ONE, [], [], anc0, 0);
+
+  var list = Array.from(people.values());
+  list.forEach(function (p) {
+    p.isUbo = over25(p.total);
+    if (corpNames.has(p.name)) warns.add("「" + p.name + "」同時被填為自然人與法人，請確認是否漏勾「法人」。");
+  });
+  // 依總持股由高到低
+  list.sort(function (a, b) { var x = a.total.n * b.total.d, y = b.total.n * a.total.d; return x < y ? 1 : x > y ? -1 : 0; });
+  var traced = list.reduce(function (s, p) { return fadd(s, p.total); }, ZERO);
+  return { people: list, cards: cards, status: status, rowPct: rowPct, totals: totals, corpEff: corpEff,
+           defs: defs, traced: traced, untraced: untraced, warns: Array.from(warns), rootTotal: totals[root.id] || 0n };
+}
+
+// 明細算式（依指定輸出格式）
+function howOf(p, withChain) {
+  var parts = [];
+  if (p.direct.n > 0n) parts.push("直接 " + pct(p.direct));
+  if (p.paths.length) {
+    parts.push("間接 (" + p.paths.map(function (x) {
+      var s = x.fracs.map(pct).join(" × ");
+      return withChain ? "經" + x.chain.join("→") + "：" + s : s;
+    }).join(" + ") + ")");
+  }
+  return parts.join(" + ") + " = " + pct(p.total);
+}
+
+function summaryText(root, a) {
+  var ubos = a.people.filter(function (p) { return p.isUbo; });
+  var out = [];
+  var rn = (root.name || "").trim();
+  if (rn) out.push("申戶公司：" + rn, "");
+  out.push("1. 實質受益人名單（持股 > 25%）");
+  if (ubos.length) ubos.forEach(function (p) { out.push("- " + p.name + "：" + pct(p.total)); });
+  else out.push("- 無");
+  out.push("", "2. 計算明細");
+  a.people.forEach(function (p) { out.push("- " + p.name + "：" + howOf(p, false)); });
+  if (a.untraced.n > 0n) out.push("", "※ 尚有 " + pct(a.untraced) + " 未穿透至自然人");
+  return out.join("\n");
+}
+/*CALC-END*/
+
+if (typeof document !== "undefined") (function () {
+  var $ = function (id) { return document.getElementById(id); };
+  var seq = 0;
+  function newRow(name, shares, isCorp, rows) {
+    return { id: "r" + (++seq), name: name || "", shares: shares || "", isCorp: !!isCorp, rows: rows || [] };
+  }
+  function example() {
+    return { id: "root", name: "A公司", rows: [
+      newRow("某甲", "50,000"),
+      newRow("某乙", "20,000"),
+      newRow("B公司", "30,000", true, [newRow("某乙", "80,000"), newRow("某丁", "30,000")])
+    ] };
+  }
+  function blank() { return { id: "root", name: "", rows: [newRow(), newRow(), newRow()] }; }
+
+  var state = example(), byId = {}, refs = {}, lastSig = "", composing = false, summary = "";
+
+  function index(co) { byId[co.id] = co; co.rows.forEach(index); }
+  function el(tag, attrs, kids) {
+    var e = document.createElement(tag);
+    for (var k in attrs || {}) {
+      if (k === "text") e.textContent = attrs[k];
+      else if (k === "cls") e.className = attrs[k];
+      else e.setAttribute(k, attrs[k]);
+    }
+    (kids || []).forEach(function (c) { if (c) e.appendChild(c); });
+    return e;
+  }
+  function fmtShares(v) { return v.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ","); }
+  function sigOf(a) {
+    return a.cards.map(function (c) { return c.co.id + "@" + c.depth; }).join(",") + "|" +
+           Object.keys(a.status).sort().map(function (k) { return k + a.status[k]; }).join(",");
+  }
+
+  function cardFor(co, depth, isRoot) {
+    var rows = el("div", { cls: "rows" }, [
+      el("div", { cls: "rh" }, [el("span", { text: "股東" }), el("span", { text: "股份" }), el("span", { text: "持股比例" }), el("span", { text: "法人" }), el("span")])
+    ]);
+    co.rows.forEach(function (r) {
+      var nameIn = el("input", { type: "text", "data-k": r.id + ":name", "data-row": r.id, "data-f": "name", placeholder: "股東名稱", "aria-label": "股東名稱", autocomplete: "off" });
+      nameIn.value = r.name;
+      var shIn = el("input", { type: "text", cls: "num", inputmode: "numeric", "data-k": r.id + ":shares", "data-row": r.id, "data-f": "shares", placeholder: "0", "aria-label": "股份", autocomplete: "off" });
+      shIn.value = r.shares;
+      var ck = el("input", { type: "checkbox", "data-corp": r.id, "aria-label": "此股東為法人" });
+      ck.checked = r.isCorp;
+      var pctEl = el("span", { cls: "pct" });
+      var note = el("div", { cls: "rnote" });
+      rows.appendChild(el("div", { cls: "r" }, [nameIn, shIn, pctEl, el("span", { cls: "ck" }, [ck]),
+        el("button", { type: "button", cls: "del", "data-del": r.id, "data-in": co.id, "aria-label": "刪除此股東", text: "×" })]));
+      rows.appendChild(note);
+      refs[r.id] = { pct: pctEl, note: note, shares: shIn };
+    });
+    var title = el("span"), sub = el("small"), sum = el("b");
+    refs["c:" + co.id] = { title: title, sub: sub, sum: sum };
+    var kids = [el("h2", {}, [title, sub])];
+    if (isRoot) {
+      var rootIn = el("input", { type: "text", id: "rootName", "data-k": "root:name", placeholder: "例如：A公司", autocomplete: "off" });
+      rootIn.value = co.name;
+      kids.push(el("div", { cls: "field" }, [el("label", { for: "rootName", text: "申戶公司名稱" }), rootIn]));
+    }
+    kids.push(rows);
+    kids.push(el("div", { cls: "foot" }, [
+      el("button", { type: "button", cls: "sm", "data-add": co.id, text: "＋ 新增股東" }),
+      el("span", { cls: "sum" }, [document.createTextNode("股份合計 "), sum])
+    ]));
+    var card = el("section", { cls: "card" + (isRoot ? "" : " sub") }, kids);
+    if (!isRoot) card.style.marginLeft = Math.min(depth - 1, 3) * 16 + "px";
+    return card;
+  }
+
+  function build(a) {
+    var box = $("inputs"), act = document.activeElement, key = act && act.getAttribute && act.getAttribute("data-k"), pos = null;
+    if (key) { try { pos = act.selectionStart; } catch (e) {} }
+    byId = {}; refs = {}; index(state);
+    box.textContent = "";
+    box.appendChild(el("div", { cls: "tools" }, [
+      el("button", { type: "button", cls: "ghost sm", id: "loadEx", text: "載入範例" }),
+      el("button", { type: "button", cls: "ghost sm", id: "clear", text: "清空" })
+    ]));
+    box.appendChild(cardFor(state, 0, true));
+    a.cards.forEach(function (c) { box.appendChild(cardFor(c.co, c.depth, false)); });
+    lastSig = sigOf(a);
+    if (key) {
+      var t = box.querySelector('[data-k="' + key + '"]');
+      if (t) { t.focus(); if (pos != null) { try { t.setSelectionRange(pos, pos); } catch (e) {} } }
+    }
+  }
+
+  function refresh(force) {
+    var a = analyze(state);
+    if (force || (sigOf(a) !== lastSig && !composing)) build(a);
+
+    // 左側：各列持股比例、提示、各卡片標題
+    var rootName = state.name.trim() || "申戶公司";
+    Object.keys(refs).forEach(function (id) {
+      var ref = refs[id];
+      if (id.indexOf("c:") === 0) {
+        var coId = id.slice(2), co = byId[coId];
+        ref.sum.textContent = fmtShares(a.totals[coId] || 0n) + " 股";
+        if (coId === "root") { ref.title.textContent = "申戶公司股東"; ref.sub.textContent = "第 1 層"; }
+        else {
+          var c = a.cards.filter(function (x) { return x.co.id === coId; })[0];
+          ref.title.textContent = (co.name.trim() || "（未命名法人）") + " 的股東";
+          ref.sub.textContent = "法人股東 · 第 " + ((c ? c.depth : 1) + 1) + " 層 · 穿透後佔 " + rootName + " " + pct(a.corpEff[coId] || ZERO);
+        }
+        return;
+      }
+      var r = byId[id], f = a.rowPct[id], st = a.status[id];
+      ref.pct.textContent = f ? pct(f) : "－";
+      ref.shares.classList.toggle("bad", parseShares(r.shares) === null);
+      ref.note.textContent =
+        st === "alias" ? "沿用「" + r.name.trim() + "」已填的股東結構" :
+        st === "cycle" ? "與上層公司交叉持股，此路徑無法穿透" : "";
+      ref.note.style.display = ref.note.textContent ? "" : "none";
+    });
+
+    // 右側結論
+    $("rootOut").textContent = state.name.trim();
+    var ubos = a.people.filter(function (p) { return p.isUbo; });
+    var ubo = $("ubo"); ubo.textContent = "";
+    if (ubos.length) ubos.forEach(function (p) {
+      ubo.appendChild(el("div", { cls: "u red" }, [el("span", { cls: "name", text: p.name }), el("span", { cls: "val", text: pct(p.total) })]));
+    });
+    else ubo.appendChild(el("div", { cls: "none", text: a.people.length ? "無自然人持股超過 25%" : "請先輸入股東與股份" }));
+
+    var detail = $("detail"); detail.textContent = "";
+    a.people.forEach(function (p) {
+      var name = el("span", { cls: "name" + (p.isUbo ? " red" : ""), text: p.name });
+      if (p.isUbo) name.appendChild(el("span", { cls: "pill", text: "> 25%" }));
+      detail.appendChild(el("div", { cls: "line" }, [
+        el("div", { cls: "top" }, [name, el("span", { cls: "val" + (p.isUbo ? " red" : ""), text: pct(p.total) })]),
+        el("div", { cls: "how", text: howOf(p, true) })
+      ]));
+    });
+
+    $("nPeople").textContent = a.people.length;
+    $("nUbo").textContent = ubos.length;
+    $("nUbo").className = ubos.length ? "red" : "";
+    $("traced").textContent = a.rootTotal > 0n ? pct(a.traced) : "－";
+    var w = $("warns"); w.textContent = "";
+    a.warns.forEach(function (t) { w.appendChild(el("li", { text: t })); });
+    if (a.untraced.n > 0n) w.appendChild(el("li", { text: "尚有 " + pct(a.untraced) + " 的股權未穿透至自然人，名單可能不完整。" }));
+
+    summary = summaryText(state, a);
+    $("copied").textContent = "";
+  }
+
+  var box = $("inputs");
+  box.addEventListener("compositionstart", function () { composing = true; });
+  box.addEventListener("compositionend", function () { composing = false; refresh(); });
+  box.addEventListener("input", function (e) {
+    var t = e.target;
+    if (t.id === "rootName") state.name = t.value;
+    else if (t.getAttribute("data-row")) byId[t.getAttribute("data-row")][t.getAttribute("data-f")] = t.value;
+    else return;
+    refresh();
+  });
+  box.addEventListener("change", function (e) {
+    var id = e.target.getAttribute("data-corp");
+    if (!id) return;
+    var r = byId[id];
+    r.isCorp = e.target.checked;
+    if (r.isCorp && !r.rows.length) r.rows = [newRow(), newRow()];
+    refresh(true);
+  });
+  // 離開股份欄位時補上千分位
+  box.addEventListener("focusout", function (e) {
+    var t = e.target;
+    if (t.getAttribute && t.getAttribute("data-f") === "shares") {
+      var v = parseShares(t.value);
+      if (v !== null && t.value.trim() !== "") { t.value = fmtShares(v); byId[t.getAttribute("data-row")].shares = t.value; }
+    }
+  });
+  box.addEventListener("click", function (e) {
+    var t = e.target;
+    if (t.id === "loadEx") { state = example(); refresh(true); return; }
+    if (t.id === "clear") { state = blank(); refresh(true); return; }
+    var add = t.getAttribute("data-add"), del = t.getAttribute("data-del");
+    if (add) {
+      var row = newRow(); byId[add].rows.push(row); refresh(true);
+      var f = box.querySelector('[data-k="' + row.id + ':name"]'); if (f) f.focus();
+    } else if (del) {
+      var co = byId[t.getAttribute("data-in")];
+      co.rows = co.rows.filter(function (r) { return r.id !== del; });
+      refresh(true);
+    }
+  });
+  $("copy").addEventListener("click", function () {
+    var done = function (ok) { $("copied").textContent = ok ? "已複製" : "無法自動複製，請手動選取文字"; };
+    try { navigator.clipboard.writeText(summary).then(function () { done(true); }, function () { done(false); }); }
+    catch (e) { done(false); }
+  });
+  refresh(true);
+})();
+</script>
+</body>
+</html>
