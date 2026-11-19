@@ -206,7 +206,7 @@ function analyze(root) {
     if (total === 0n && depth > 0 && mult.n > 0n) {
       untraced = fadd(untraced, mult); warns.add("「" + label(co) + "」尚未輸入股東股份，其持股無法穿透。");
     }
-    co.rows.forEach(function (r) {
+    co.rows.forEach(function (r, idx) {
       var s = parseShares(r.shares), name = (r.name || "").trim();
       if (s === null) warns.add("「" + label(co) + "」有股份欄位不是整數，該列未計入。");
       // 股份為 0 或未填時比例視為 0，但法人列仍要展開，才能先建結構再填股份
@@ -231,7 +231,10 @@ function analyze(root) {
         walk(def, m, chain.concat([label(def)]), fracs.concat([f]), anc2, depth + 1);
       } else {
         if (m.n === 0n) return;
-        if (!name) { untraced = fadd(untraced, m); warns.add("「" + label(co) + "」有股東未填名稱，該列未歸戶。"); return; }
+        if (!name) {
+          name = "（未命名）" + label(co) + " 第 " + (idx + 1) + " 列";
+          warns.add("「" + label(co) + "」有股東未填名稱，暫以列號代稱計入。");
+        }
         var p = people.get(name);
         if (!p) { p = { name: name, direct: ZERO, paths: [], total: ZERO }; people.set(name, p); }
         if (chain.length === 0) p.direct = fadd(p.direct, m);
@@ -289,6 +292,18 @@ if (typeof document !== "undefined") (function () {
   function newRow(name, shares, isCorp, rows) {
     return { id: "r" + (++seq), name: name || "", shares: shares || "", isCorp: !!isCorp, rows: rows || [] };
   }
+  // 找出全頁「股東N」的最大序號，回傳下一個名稱
+  function nextName() {
+    var max = 0;
+    (function w(co) {
+      co.rows.forEach(function (r) {
+        var m = /^股東(\d+)$/.exec((r.name || "").trim());
+        if (m) max = Math.max(max, parseInt(m[1], 10));
+        w(r);
+      });
+    })(state);
+    return "股東" + (max + 1);
+  }
   function example() {
     return { id: "root", name: "A公司", rows: [
       newRow("某甲", "50,000"),
@@ -296,7 +311,7 @@ if (typeof document !== "undefined") (function () {
       newRow("B公司", "30,000", true, [newRow("某乙", "80,000"), newRow("某丁", "30,000")])
     ] };
   }
-  function blank() { return { id: "root", name: "", rows: [newRow(), newRow(), newRow()] }; }
+  function blank() { return { id: "root", name: "", rows: [newRow("股東1"), newRow("股東2"), newRow("股東3")] }; }
 
   var state = example(), byId = {}, refs = {}, lastSig = "", composing = false, summary = "";
 
@@ -445,7 +460,7 @@ if (typeof document !== "undefined") (function () {
     if (!id) return;
     var r = byId[id];
     r.isCorp = e.target.checked;
-    if (r.isCorp && !r.rows.length) r.rows = [newRow(), newRow()];
+    if (r.isCorp && !r.rows.length) { r.rows = [newRow(nextName())]; r.rows.push(newRow(nextName())); }
     refresh(true);
   });
   // 離開股份欄位時補上千分位
@@ -462,8 +477,8 @@ if (typeof document !== "undefined") (function () {
     if (t.id === "clear") { state = blank(); refresh(true); return; }
     var add = t.getAttribute("data-add"), del = t.getAttribute("data-del");
     if (add) {
-      var row = newRow(); byId[add].rows.push(row); refresh(true);
-      var f = box.querySelector('[data-k="' + row.id + ':name"]'); if (f) f.focus();
+      var row = newRow(nextName()); byId[add].rows.push(row); refresh(true);
+      var f = box.querySelector('[data-k="' + row.id + ':name"]'); if (f) { f.focus(); f.select(); }
     } else if (del) {
       var co = byId[t.getAttribute("data-in")];
       co.rows = co.rows.filter(function (r) { return r.id !== del; });
